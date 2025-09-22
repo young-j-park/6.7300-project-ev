@@ -1,4 +1,3 @@
-import time
 
 import jax.numpy as jnp
 import numpy as np
@@ -15,7 +14,6 @@ def main():
     u = jnp.array([0.0, 0.0])
     
     f = evalf(x0, p_tuple, u)
-    # print(f)
     
     assert np.all(f == 0.0)
     
@@ -97,5 +95,5 @@ def main():
     print(f"Passed the level turn test ({n_trials} trials)")
 
 
-if __name__ == "main":
+if __name__ == "__main__":
     main()
