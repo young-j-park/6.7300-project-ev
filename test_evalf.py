@@ -1,4 +1,8 @@
 
+import json
+import jax
+jax.config.update("jax_enable_x64", True)
+
 import jax.numpy as jnp
 import numpy as np
 
@@ -6,9 +10,27 @@ from vehicle_model_jax import evalf, get_default_params
 
 
 def main():
+
+    # 0. Mannual Regression
+    with open('./test_benchmarks/test_cases.json', 'r') as f:
+        data = json.load(f)
+
+    for test_case in data:
+        x0 = jnp.array(test_case["x"])
+        p_tuple = tuple(test_case["p"])
+        u = jnp.array(test_case["u"])
+        f_true = jnp.array(test_case["f"])
+        f = evalf(x0, p_tuple, u)
+
+        assert np.all(np.abs(f_true - f) < 1e-10)
+    
+    print("Passed the manual regression test")
+        
+
+    # Load Default Params
     p = get_default_params()
     p_tuple = tuple(p.values())
-
+    
     # 1. Steady State
     x0 = jnp.zeros(10)
     u = jnp.array([0.0, 0.0])

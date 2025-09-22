@@ -1,4 +1,8 @@
 
+import json
+import jax
+jax.config.update("jax_enable_x64", True)
+
 import jax.numpy as jnp
 import numpy as np
 
@@ -39,6 +43,24 @@ def is_close(y, yhat, eps=1e-10):
 
 
 def main():
+
+    # 0. Mannual Regression
+    with open('./test_benchmarks/test_cases.json', 'r') as f:
+        data = json.load(f)
+
+    for test_case in data:
+        x0 = jnp.array(test_case["x"])
+        p_tuple = tuple(test_case["p"])
+        u = jnp.array(test_case["u"])
+        J_true = jnp.array(test_case["J"])
+        J = compute_jacobian_jax(x0, p_tuple, u)
+
+        assert np.all(np.abs(J_true - J).flatten() < 1e-10)
+    
+    print("Passed the manual regression test")
+        
+
+    # Load Default Params
     p = get_default_params()
     p_tuple = tuple(p.values())
 
