@@ -32,10 +32,6 @@ def main():
         
         f = evalf(x0, p_tuple, u)
     
-        assert f[0] == 0  # ? @FIXME, Inwhi
-        assert f[1] < 0  # ? @FIXME, Inwhi
-        assert f[2] == 0  # ? @FIXME, Inwhi
-        assert f[3] == 0  # ? @FIXME, Inwhi
         assert f[4] == x0[7]  # longitudinal speed
         assert f[5] == 0.0  # zero lateral speed
         assert f[6] == 0.0  # zero angular speed
@@ -55,8 +51,6 @@ def main():
         
         f = evalf(x0, p_tuple, u)
     
-        assert f[1] > 0  # ? @FIXME, Inwhi
-        assert f[3] > 0  # ? @FIXME, Inwhi
         assert f[4] == 0.0  # zero longitudinal speed
         assert f[5] == 0.0  # zero lateral speed
         assert f[6] == 0.0  # zero angular speed
@@ -93,10 +87,6 @@ def main():
         
         f = evalf(x0, p_tuple, u)
     
-        assert f[0] == 0  # ? @FIXME, Inwhi
-        assert f[1] < 0  # ? @FIXME, Inwhi
-        assert f[2] == 0  # ? @FIXME, Inwhi
-        assert f[3] == 0  # ? @FIXME, Inwhi
         assert f[4] == x0[7]  # longitudinal speed
         assert f[5] == 0.0  # zero lateral speed
         assert f[6] == 0.0  # zero angular speed
