@@ -55,7 +55,7 @@ def main():
         assert f[4] == x0[7]  # longitudinal speed
         assert f[5] == 0.0  # zero lateral speed
         assert f[6] == 0.0  # zero angular speed
-        assert f[7] < 0.0  # drag
+        assert f[7] <  0.0  # drag
         assert f[8] == 0.0  # zero angular acceleration
         assert f[9] == 0.0  # no speed delta needed
     
@@ -110,8 +110,8 @@ def main():
         assert f[4] == x0[7]  # longitudinal speed
         assert f[5] == 0.0  # zero lateral speed
         assert f[6] == 0.0  # zero angular speed
-        assert f[7] < 0.0  # drag
-        assert f[8] > 0  # angular acceleration
+        assert f[7] <  0.0  # drag
+        assert f[8] >  0.0  # angular acceleration
         assert f[9] == 0.0  # no speed delta needed
     
     print(f"Passed the level turn test ({n_trials} trials)")
