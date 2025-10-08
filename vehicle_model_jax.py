@@ -114,7 +114,7 @@ def evalf(x, p_tuple, u):
 def evalf_np(x, p_tuple, u):
     x_np = jnp.array(x[:, 0])
     u_np = jnp.array(u)
-    return evalf(x_np, p_tuple, u_np)
+    return evalf(x_np, p_tuple, u_np)[:, None]
 
 
 jacobian_func_raw = jax.jacobian(evalf, argnums=0)  # derivative w.r.t. x
