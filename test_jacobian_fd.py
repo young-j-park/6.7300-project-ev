@@ -7,7 +7,7 @@ from typing import Tuple, List, Callable
 
 jax.config.update("jax_enable_x64", True)
 
-from vehicle_model_jax import evalf, compute_jacobian_jax, get_default_params
+from vehicle_model_jax import evalf, evalf_np, compute_jacobian_jax, get_default_params
 from eval_Jf_FiniteDifference import eval_Jf_FiniteDifference
 
 EPS = 1e-3
@@ -76,7 +76,7 @@ def test_steady_state(p_tuple: tuple, eps: float = EPS, use_analytic: bool = Fal
         J_reference = compute_analytic_jacobian(x0, p_tuple, u)
         method = "analytic"
     else:
-        J_reference, _ = eval_Jf_FiniteDifference(evalf, x0, p_tuple, u)
+        J_reference, _ = eval_Jf_FiniteDifference(evalf_np, x0, p_tuple, u)
         method = "finite_difference"
     
     passed, max_error, avg_error = check_jacobians(J_jax, J_reference, eps)
@@ -101,7 +101,7 @@ def run_trial_based_test(
         if use_analytic:
             J_reference = compute_analytic_jacobian(x0, p_tuple, u)
         else:
-            J_reference, _ = eval_Jf_FiniteDifference(evalf, x0, p_tuple, u)
+            J_reference, _ = eval_Jf_FiniteDifference(evalf_np, x0, p_tuple, u)
         
         _, _, avg_error = check_jacobians(J_jax, J_reference, eps)
         all_errors.append(avg_error)
