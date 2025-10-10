@@ -7,7 +7,7 @@ from typing import Tuple, List, Callable
 
 jax.config.update("jax_enable_x64", True)
 
-from vehicle_model_jax import evalf, evalf_np, compute_jacobian_jax, get_default_params
+from vehicle_model_jax import evalf, evalf_np, compute_jacobian_jax, get_default_params, OUTPUT_POSITIONS, N_STATES, IDX_V
 from eval_Jf_FiniteDifference import eval_Jf_FiniteDifference
 
 EPS = 1e-3
@@ -42,6 +42,21 @@ def compute_analytic_jacobian(x0: jnp.ndarray, p_tuple: tuple, u: jnp.ndarray) -
     return jacobian_fn(x0)
 
 
+def convert_state_vector(x_full: jnp.ndarray) -> jnp.ndarray:
+    if not OUTPUT_POSITIONS and len(x_full) == 10:
+        # Remove indices 4 and 5 (x_pos, y_pos)
+        return jnp.concatenate([x_full[:4], x_full[6:]])
+    return x_full
+
+
+def convert_jacobian_matrix(J_full: jnp.ndarray) -> jnp.ndarray:
+    if not OUTPUT_POSITIONS and J_full.shape[0] == 10:
+        # Remove rows 4 and 5, then columns 4 and 5
+        mask = jnp.array([i not in [4, 5] for i in range(10)])
+        return J_full[mask][:, mask]
+    return J_full
+
+
 def test_manual_regression(p_tuple: tuple, eps: float = EPS) -> TestResult:
     with open('./test_benchmarks/test_cases.json', 'r') as f:
         data = json.load(f)
@@ -50,10 +65,14 @@ def test_manual_regression(p_tuple: tuple, eps: float = EPS) -> TestResult:
     max_error = 0.0
     
     for test_case in data:
-        x0 = jnp.array(test_case["x"])
+        x0_full = jnp.array(test_case["x"])
+        x0 = convert_state_vector(x0_full)
+        
         p_case = tuple(test_case["p"])
         u = jnp.array(test_case["u"])
-        J_true = jnp.array(test_case["J"])
+        
+        J_true_full = jnp.array(test_case["J"])
+        J_true = convert_jacobian_matrix(J_true_full)
         
         J = compute_jacobian_jax(x0, p_case, u)
         errors = np.abs(J_true - J).flatten()
@@ -67,7 +86,7 @@ def test_manual_regression(p_tuple: tuple, eps: float = EPS) -> TestResult:
 
 
 def test_steady_state(p_tuple: tuple, eps: float = EPS, use_analytic: bool = False) -> TestResult:
-    x0 = jnp.zeros(10)
+    x0 = jnp.zeros(N_STATES)
     u = jnp.array([0.0, 0.0])
     
     J_jax = compute_jacobian_jax(x0, p_tuple, u)
@@ -117,8 +136,8 @@ def run_trial_based_test(
 def test_constant_speed(p_tuple: tuple, n_trials: int = 1000, eps: float = EPS, use_analytic: bool = False) -> TestResult:
     def state_gen(trial):
         v0 = np.random.rand() * 10.0
-        x0 = jnp.zeros(10)
-        x0 = x0.at[7].set(v0)  # v
+        x0 = jnp.zeros(N_STATES)
+        x0 = x0.at[IDX_V].set(v0)  # v
         u = jnp.array([v0, 0.0])
         return x0, u
     
@@ -128,7 +147,7 @@ def test_constant_speed(p_tuple: tuple, n_trials: int = 1000, eps: float = EPS, 
 def test_acceleration(p_tuple: tuple, n_trials: int = 1000, eps: float = EPS, use_analytic: bool = False) -> TestResult:
     def state_gen(trial):
         v0 = np.random.rand() * 10.0
-        x0 = jnp.zeros(10)
+        x0 = jnp.zeros(N_STATES)
         u = jnp.array([v0, 0.0])
         return x0, u
     
@@ -138,7 +157,7 @@ def test_acceleration(p_tuple: tuple, n_trials: int = 1000, eps: float = EPS, us
 def test_spin(p_tuple: tuple, n_trials: int = 1000, eps: float = EPS, use_analytic: bool = False) -> TestResult:
     def state_gen(trial):
         w0 = np.random.rand() * np.pi / 2
-        x0 = jnp.zeros(10)
+        x0 = jnp.zeros(N_STATES)
         u = jnp.array([0.0, w0])
         return x0, u
     
@@ -149,8 +168,8 @@ def test_level_turn(p_tuple: tuple, n_trials: int = 1000, eps: float = EPS, use_
     def state_gen(trial):
         v0 = np.random.rand() * 10.0
         w0 = np.random.rand() * np.pi / 2
-        x0 = jnp.zeros(10)
-        x0 = x0.at[7].set(v0)  # v
+        x0 = jnp.zeros(N_STATES)
+        x0 = x0.at[IDX_V].set(v0)  # v
         u = jnp.array([v0, w0])
         return x0, u
     
@@ -175,6 +194,13 @@ def main():
     
     # Configuration: set to True to use analytic Jacobian instead of finite difference
     USE_ANALYTIC = False
+    
+    # Print configuration
+    print("=" * 60)
+    print(f"Configuration: OUTPUT_POSITIONS = {OUTPUT_POSITIONS}")
+    print(f"Number of states: {N_STATES}")
+    print("=" * 60)
+    print()
     
     # Run all tests
     tests = [

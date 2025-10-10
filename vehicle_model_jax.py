@@ -4,6 +4,16 @@ jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
 
+# Flag to control whether position states are included
+OUTPUT_POSITIONS = False
+
+if OUTPUT_POSITIONS:
+    N_STATES = 10
+    IDX_V = 7
+else:
+    N_STATES = 8
+    IDX_V = 5
+    
 
 def get_default_params():
     """
@@ -54,8 +64,12 @@ def evalf(x, p_tuple, u):
     Compute the derivates of the states: dx/dt
     """
     # 1. Unpack x (state), p (parameter), u (input)
-    i_ds_r, i_qs_r, I_err_ds, I_err_qs, x_pos, y_pos, theta, v, omega, I_err_v = x
+    if OUTPUT_POSITIONS:
+        i_ds_r, i_qs_r, I_err_ds, I_err_qs, x_pos, y_pos, theta, v, omega, I_err_v = x
+    else:
+        i_ds_r, i_qs_r, I_err_ds, I_err_qs, theta, v, omega, I_err_v = x
 
+    
     m, I, c_d, c_r, \
     R_s, L_ds, L_qs, lambda_f, p_pairs, \
     G, r_w, eta_g, k, \
@@ -96,18 +110,29 @@ def evalf(x, p_tuple, u):
     w_tau = -c_wy * v_a * jnp.abs(v_a)
 
     # 4. State Equations (dx/dt)
-    dxdt = jnp.zeros(10)
-    dxdt = dxdt.at[0].set((1/L_ds) * (V_ds_r - R_s*i_ds_r + omega_m*L_qs*i_qs_r))
-    dxdt = dxdt.at[1].set((1/L_qs) * (V_qs_r - R_s*i_qs_r - omega_m*(L_ds*i_ds_r + lambda_f)))
-    dxdt = dxdt.at[2].set(i_ds_ref_r - i_ds_r)
-    dxdt = dxdt.at[3].set(i_qs_ref_r - i_qs_r)
-    dxdt = dxdt.at[4].set(v * jnp.cos(theta))
-    dxdt = dxdt.at[5].set(v * jnp.sin(theta))
-    dxdt = dxdt.at[6].set(omega)
-    dxdt = dxdt.at[7].set((1/m) * (k * (3/2) * p_pairs * lambda_f * i_qs_r - c_d*v + w_F))
-    dxdt = dxdt.at[8].set((1/I) * (K_p_theta*(theta_ref - theta) - K_d_theta*omega - c_r*omega + w_tau))
-    dxdt = dxdt.at[9].set(v_ref - v)
-    
+    if OUTPUT_POSITIONS:
+        dxdt = jnp.zeros(10)
+        dxdt = dxdt.at[0].set((1/L_ds) * (V_ds_r - R_s*i_ds_r + omega_m*L_qs*i_qs_r))
+        dxdt = dxdt.at[1].set((1/L_qs) * (V_qs_r - R_s*i_qs_r - omega_m*(L_ds*i_ds_r + lambda_f)))
+        dxdt = dxdt.at[2].set(i_ds_ref_r - i_ds_r)
+        dxdt = dxdt.at[3].set(i_qs_ref_r - i_qs_r)
+        dxdt = dxdt.at[4].set(v * jnp.cos(theta))
+        dxdt = dxdt.at[5].set(v * jnp.sin(theta))
+        dxdt = dxdt.at[6].set(omega)
+        dxdt = dxdt.at[7].set((1/m) * (k * (3/2) * p_pairs * lambda_f * i_qs_r - c_d*v + w_F))
+        dxdt = dxdt.at[8].set((1/I) * (K_p_theta*(theta_ref - theta) - K_d_theta*omega - c_r*omega + w_tau))
+        dxdt = dxdt.at[9].set(v_ref - v)
+    else:
+        dxdt = jnp.zeros(8)
+        dxdt = dxdt.at[0].set((1/L_ds) * (V_ds_r - R_s*i_ds_r + omega_m*L_qs*i_qs_r))
+        dxdt = dxdt.at[1].set((1/L_qs) * (V_qs_r - R_s*i_qs_r - omega_m*(L_ds*i_ds_r + lambda_f)))
+        dxdt = dxdt.at[2].set(i_ds_ref_r - i_ds_r)
+        dxdt = dxdt.at[3].set(i_qs_ref_r - i_qs_r)
+        dxdt = dxdt.at[4].set(omega)
+        dxdt = dxdt.at[5].set((1/m) * (k * (3/2) * p_pairs * lambda_f * i_qs_r - c_d*v + w_F))
+        dxdt = dxdt.at[6].set((1/I) * (K_p_theta*(theta_ref - theta) - K_d_theta*omega - c_r*omega + w_tau))
+        dxdt = dxdt.at[7].set(v_ref - v)
+        
     return dxdt
 
 
