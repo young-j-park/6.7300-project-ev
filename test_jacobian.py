@@ -59,7 +59,7 @@ J_analytic_no_pos = {
 if OUTPUT_POSITIONS:
     J_ANALYTIC = J_analytic_with_pos
 else:
-    J_ANALYTIC = J_analytic_no_pos]
+    J_ANALYTIC = J_analytic_no_pos
 
 
 def is_close(y, yhat, eps=1e-10):
