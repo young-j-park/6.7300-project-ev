@@ -237,5 +237,9 @@ def main():
 	with open(out_dir / 'param_sweep_summary.txt', 'w') as sf:
 		for param, info in param_summaries.items():
 			sf.write(f"{param}: max={info['max']}, mean={info['mean']}\n")
-
+			
+if __name__ == '__main__':
+	main()
 	
+
+
