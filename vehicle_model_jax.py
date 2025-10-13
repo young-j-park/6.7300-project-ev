@@ -48,7 +48,7 @@ def get_default_params():
         'K_d_theta': 1000.0, # yaw controller - derivative gain
         
         # Wind
-        'v_w': 0.0,        # wind speed (m/s)
+        'v_w': 1.0,        # wind speed (m/s)
         'psi': 0.0,        # wind direction (rad)
         'c_wx': 0.5,      # wind longitudinal aerodynamic coefficient
         'c_wy': 0.5       # wind lateral aerodynamic coefficient
