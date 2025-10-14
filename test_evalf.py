@@ -6,6 +6,32 @@ import numpy as np
 from vehicle_model_jax import evalf, get_default_params, OUTPUT_POSITIONS
 
 
+def compute_wind_force(p, v_state=0.0, theta=0.0):
+    """Compute longitudinal wind force w_F given parameter dict p and state v,theta."""
+    v_w = p['v_w']
+    psi = p['psi']
+    c_wx = p['c_wx']
+    u_a = v_state - v_w * np.cos(psi - theta)
+    w_F = -c_wx * u_a * abs(u_a)
+    return w_F
+
+
+def expected_longitudinal_accel(p, v_state=0.0, i_qs_r_state=0.0, theta=0.0):
+    """Compute expected longitudinal acceleration (dxdt at idx_v) using params p.
+    Includes electromagnetic torque term from i_qs_r_state, drag, and wind force.
+    """
+    m = p['m']
+    k = p.get('k', p['eta_g'] * p['G'] / p['r_w'])
+    p_pairs = p['p_pairs']
+    lambda_f = p['lambda_f']
+    c_d = p['c_d']
+
+    # electromagnetic torque contribution: k * (3/2) * p_pairs * lambda_f * i_qs_r
+    em_term = k * (3.0/2.0) * p_pairs * lambda_f * i_qs_r_state
+    w_F = compute_wind_force(p, v_state=v_state, theta=theta)
+    return (1.0 / m) * (em_term - c_d * v_state + w_F)
+
+
 def main():
     # Determine state indices based on OUTPUT_POSITIONS flag
     if OUTPUT_POSITIONS:
@@ -65,10 +91,14 @@ def main():
     u = jnp.array([0.0, 0.0])
     
     f = evalf(x0, p_tuple, u)
-    
-    assert np.all(f == 0.0)
-    
-    print("Passed the steady-state test")
+
+    expected = np.zeros(n_states, dtype=float)
+    expected[idx_v] = expected_longitudinal_accel(p, v_state=0.0, i_qs_r_state=0.0, theta=0.0)
+
+    # compare with tolerance because of floating point / JAX types
+    assert np.allclose(np.array(f, dtype=float), expected, atol=1e-12)
+
+    print("Passed the steady-state test (accounting for wind/default forcing)")
     
     # 2. Constant Speed
     n_trials = 1000
@@ -85,7 +115,8 @@ def main():
             assert f[idx_x_pos] == x0[idx_v]  # dx/dt = v*cos(0)
             assert f[idx_y_pos] == 0.0  # dy/dt = v*sin(0) = 0
         assert f[idx_theta] == 0.0  # zero angular speed
-        assert f[idx_v] < 0.0  # drag
+        expected_v = expected_longitudinal_accel(p, v_state=float(v0), i_qs_r_state=0.0, theta=0.0)
+        assert np.allclose(float(f[idx_v]), float(expected_v), atol=1e-12)
         assert f[idx_omega] == 0.0  # zero angular acceleration
         assert f[idx_I_err_v] == 0.0  # no speed delta needed
     
@@ -105,7 +136,8 @@ def main():
             assert f[idx_x_pos] == 0.0  # zero longitudinal speed
             assert f[idx_y_pos] == 0.0  # zero lateral speed
         assert f[idx_theta] == 0.0  # zero angular speed
-        assert f[idx_v] == 0.0  # zero longitudinal external force 
+        expected_v = expected_longitudinal_accel(p, v_state=0.0, i_qs_r_state=0.0, theta=0.0)
+        assert np.allclose(float(f[idx_v]), float(expected_v), atol=1e-12)
         assert f[idx_omega] == 0.0  # zero angular acceleration
         assert f[idx_I_err_v] == u[0]  # speed delta
     
@@ -123,10 +155,18 @@ def main():
     
         assert f[idx_omega] > 0.0  # angular acceleration
         
-        # Check all other states are zero
+        # Check other states match expected values given defaults (wind may produce
+        # a non-zero longitudinal acceleration). Compute expected longitudinal
+        # acceleration same as in the steady-state test.
+        expected = np.zeros(n_states, dtype=float)
+        expected[idx_v] = expected_longitudinal_accel(p, v_state=0.0, i_qs_r_state=0.0, theta=0.0)
+
+        # compare all entries: omega should be positive but we only check sign;
+        # other states should equal expected
         for i in range(n_states):
-            if i != idx_omega:
-                assert f[i] == 0.0
+            if i == idx_omega:
+                continue
+            assert np.allclose(float(f[i]), float(expected[i]), atol=1e-12)
     
     print(f"Passed the spinning test ({n_trials} trials)")
     
@@ -146,7 +186,11 @@ def main():
             assert f[idx_x_pos] == x0[idx_v]  # longitudinal speed
             assert f[idx_y_pos] == 0.0  # zero lateral speed
         assert f[idx_theta] == 0.0  # zero angular speed
-        assert f[idx_v] < 0.0  # drag
+        # compute expected longitudinal acceleration for level turn (same as
+        # constant-speed calculation: drag + wind; electromagnetic term zero for
+        # zero currents)
+        expected_v = expected_longitudinal_accel(p, v_state=float(v0), i_qs_r_state=0.0, theta=0.0)
+        assert np.allclose(float(f[idx_v]), float(expected_v), atol=1e-12)
         assert f[idx_omega] > 0.0  # angular acceleration
         assert f[idx_I_err_v] == 0.0  # no speed delta needed
     

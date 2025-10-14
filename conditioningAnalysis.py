@@ -118,19 +118,6 @@ def compute_condition_numbers(xs, p_tuple, max_samples=None):
 	return np.array(conds), {'bad': bad, 'total': total}
 
 
-def parameter_sweep_delta_L(base_p, x0, deltas):
-	"""Sweep delta_L = L_ds - L_qs by adjusting L_ds while holding L_qs constant.
-	Returns arrays of delta and condition numbers (for single representative operating point x0).
-	"""
-	# Deprecated specific function: delegate to generic sweep
-	return parameter_sweep_param(base_p, x0, 'delta_L', deltas)
-
-
-def parameter_sweep_mass(base_p, x0, masses):
-	# Deprecated specific function: delegate to generic sweep
-	return parameter_sweep_param(base_p, x0, 'm', masses)
-
-
 def parameter_sweep_param(base_p, x0, param_name, values):
 	"""Generic parameter sweep.
 	param_name: string name of parameter in p_dict to set. Special-case 'delta_L'
@@ -202,7 +189,7 @@ def main():
 
 	# 2) sweep every parameter in KEYS (except 'k' which is derived, and 'delta_L' is special-case)
 	print('Running full parameter sweeps for all parameters...')
-	x0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0], dtype=np.float64)
+	x0 = np.array([0.0, 0.0, 0.0, 0.0, 4.0, 25.0, 0.0, 0.0], dtype=np.float64)
 	param_summaries = {}
 	for param in KEYS:
 		if param == 'k':
