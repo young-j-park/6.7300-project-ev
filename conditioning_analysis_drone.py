@@ -13,7 +13,7 @@ import numpy as np
 from drone_model_jax import (
     N_STATES, IDX,
     get_default_params, pack_params,
-    evalf, compute_jacobian_jax
+    evalf, compute_jacobian_jax, unpack_params
 )
 
 # ---------- Robust SVD-based condition number ----------
@@ -157,6 +157,80 @@ def sample_condition_over_traj(x0, p_tuple, u_fun, T=2.0, dt=1e-3, reg_eps: floa
 
     return t_grid, cond2_list, smin_list, smax_list
 
+
+def conditioning_analysis_swarm(p_list, reg_eps: float = 0.0):
+    """Analyze conditioning for a swarm of drones.
+
+    Args:
+        p_list: sequence of packed param tuples (as returned by `pack_params`)
+                or sequence of parameter dicts (as returned by `get_default_params`).
+        reg_eps: regularization epsilon passed to SVD cond (optional).
+
+    Behavior:
+        - If all drones have identical parameters, runs the single-drone
+          conditioning analysis at hover (using `analyze_point`) for just
+          one drone and returns that result dict.
+        - If drones have heterogeneous parameters, computes the condition
+          number at hover for each drone and returns the maximum condition
+          number found as a float in the key 'max_cond2'.
+
+    Returns:
+        If homogeneous: dict returned by `analyze_point` with extra key 'same'=True.
+        If heterogeneous: dict { 'same': False, 'max_cond2': float }
+    """
+    # Normalize inputs to packed tuples
+    normalized = []
+    for p in p_list:
+        if isinstance(p, dict):
+            normalized.append(pack_params(p))
+        else:
+            # assume tuple/list/ndarray-like packed params
+            normalized.append(tuple(p))
+
+    if len(normalized) == 0:
+        raise ValueError("p_list must contain at least one parameter entry")
+
+    # Use numerical closeness to decide homogeneity (tolerant to tiny float diffs)
+    first = jnp.asarray(normalized[0], dtype=jnp.float64)
+    homogeneous = True
+    for p in normalized[1:]:
+        if not np.allclose(np.asarray(p, dtype=np.float64), np.asarray(first, dtype=np.float64)):
+            homogeneous = False
+            break
+
+    if homogeneous:
+        # Unpack to dict to build hover state
+        p_dict = unpack_params(first)
+        x_hover, u_hover = build_hover_state_and_input(p_dict)
+        res = analyze_point(x_hover, first, u_hover, reg_eps=reg_eps)
+        res_out = {
+            'same': True,
+            'cond2': res['cond2'],
+            'details': res,
+        }
+        return res_out
+
+    # Heterogeneous: evaluate each drone's cond2 at its hover
+    max_cond = -np.inf
+    max_idx = None
+    for i, pt in enumerate(normalized):
+        p_dict = unpack_params(pt)
+        x_hover, u_hover = build_hover_state_and_input(p_dict)
+        res = analyze_point(x_hover, pt, u_hover, reg_eps=reg_eps)
+        try:
+            c = float(res['cond2'])
+        except Exception:
+            c = np.inf
+        if c > max_cond:
+            max_cond = c
+            max_idx = i
+
+    return {
+        'same': False,
+        'max_cond2': float(max_cond),
+        'index_of_max': max_idx,
+    }
+
 # ---------- Example run ----------
 if __name__ == "__main__":
     # 1) Parameters
@@ -185,3 +259,22 @@ if __name__ == "__main__":
           "min =", np.nanmin(cond2_t),
           "median =", np.nanmedian(cond2_t),
           "max =", np.nanmax(cond2_t))
+
+    # -----------------------------
+    # Swarm conditioning analysis
+    # -----------------------------
+    # Homogeneous swarm (5 identical drones)
+    p_tuple_shared = pack_params(p_dict)
+    p_list_hom = [p_tuple_shared for _ in range(5)]
+    swarm_res_hom = conditioning_analysis_swarm(p_list_hom, reg_eps=1e-8)
+    print("[Swarm - homogeneous] same:", swarm_res_hom.get('same'))
+    print("[Swarm - homogeneous] cond2:", swarm_res_hom.get('cond2'))
+
+    # Heterogeneous swarm example (one drone with a slightly different Dt)
+    p_base = get_default_params()
+    p_alt = dict(p_base)
+    p_alt['Dt'] = p_base['Dt'] * 5.0  # increased translational damping for one drone
+    p_list_het = [pack_params(p_base), pack_params(p_alt), pack_params(p_base)]
+    swarm_res_het = conditioning_analysis_swarm(p_list_het, reg_eps=1e-8)
+    print("[Swarm - heterogeneous] same:", swarm_res_het.get('same'))
+    print("[Swarm - heterogeneous] max_cond2:", swarm_res_het.get('max_cond2'))
