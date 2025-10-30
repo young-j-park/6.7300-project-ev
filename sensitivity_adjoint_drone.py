@@ -14,7 +14,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from drone_model_jax import (
+from model.drone_model_jax import (
     N_STATES, IDX,
     PACK_ORDER,              # parameter key order
     get_default_params,      # -> dict
