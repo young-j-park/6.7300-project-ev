@@ -87,6 +87,15 @@ def random_state(rng):
 
 
 def main():
+    # Do Manual Tests
+    with open('./test_benchmarks/test_cases.json', 'r') as f:
+        test_cases = json.load(f)
+
+    for case in test_cases:
+        J_gt = case['J']
+        J_out = compute_jacobian_jax(jnp.array(case['x']), tuple(case['p']), jnp.array(case['u']))
+        assert np.allclose(J_gt, J_out, atol=1e-12)
+            
     # -------------------------------
     # Setup params and tuple
     # -------------------------------

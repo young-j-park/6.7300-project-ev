@@ -1,4 +1,6 @@
 # test_evalf.py  (compatible with new drone_model_jax.py)
+import json
+
 import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
@@ -37,6 +39,15 @@ def expected_translational_accel(p, x):
     return ay, az
 
 def main():
+    # Do Manual Tests
+    with open('./test_benchmarks/test_cases.json', 'r') as f:
+        test_cases = json.load(f)
+    
+    for case in test_cases:
+        f_gt = case['f']
+        f_out = evalf(jnp.array(case['x']), tuple(case['p']), jnp.array(case['u']))
+        assert np.allclose(f_gt, f_out, atol=1e-12)
+
     # params & tuple (must match pack order)
     p = get_default_params()
     p_tuple = pack_params(p)
