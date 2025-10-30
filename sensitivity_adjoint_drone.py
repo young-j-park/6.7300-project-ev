@@ -4,7 +4,7 @@
 #   dx/dt = f(x, p, u),   y = g(x, p, u)
 # (a) Finite-difference (FD) sensitivities of x*, y* wrt p and u
 # (b) Step-size sweep utilities
-# (c) Ranking by |dy*/d·|
+# (c) Ranking by |dy*/dÂ·|
 # (d) Adjoint sensitivities on the linearized steady-state system
 # ------------------------------------------------------------
 
@@ -14,7 +14,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from drone_model_jax import (
+from model.drone_model_jax import (
     N_STATES, IDX,
     PACK_ORDER,              # parameter key order
     get_default_params,      # -> dict
@@ -22,6 +22,7 @@ from drone_model_jax import (
     unpack_params,           # tuple -> dict
     evalf                    # x' = f(x, p_tuple, u)
 )
+from utils.drone_utils import build_hover_state_and_input
 
 jax.config.update("jax_enable_x64", True)
 
@@ -63,53 +64,6 @@ def g_with_pvec(x, p_vec, u, p_template):
 
 def g_with_uvec(x, p_tuple, u_vec):
     return g(x, p_tuple, u_vec)
-
-# ---------- a reasonable equilibrium initializer (hover) ----------
-def build_hover_state_and_input(p_dict):
-    """
-    Hover assumptions:
-      - theta = 0, wd = 0
-      - y = z = 0, v_y = v_z = 0
-      - Total thrust FT = m*g  -> each motor thrust = m*g/2
-      - wm_hover = sqrt((m*g/2)/kt)
-      - Electrical: id=0, iq=0 -> lamd=lamf, lamq=0
-      - All PI integrators = 0
-    Input: u = [y_ref, z_ref]
-    """
-    x = np.zeros(N_STATES, dtype=np.float64)
-    m, g, kt = float(p_dict['m']), float(p_dict['g']), float(p_dict['kt'])
-    lamf = float(p_dict['lamf'])
-    wm_hover = float(np.sqrt((m * g) / (2.0 * kt)))
-
-    # motor fluxes (id=0, iq=0)
-    x[IDX['lamdsr_L']] = lamf
-    x[IDX['lamqsr_L']] = 0.0
-    x[IDX['lamdsr_R']] = lamf
-    x[IDX['lamqsr_R']] = 0.0
-
-    # PI integrators
-    x[IDX['integ_id_L']] = 0.0
-    x[IDX['integ_iq_L']] = 0.0
-    x[IDX['integ_id_R']] = 0.0
-    x[IDX['integ_iq_R']] = 0.0
-    x[IDX['integ_w_L']]  = 0.0
-    x[IDX['integ_w_R']]  = 0.0
-
-    # motor speeds
-    x[IDX['wm_L']] = wm_hover
-    x[IDX['wm_R']] = wm_hover
-
-    # body pose & velocities
-    x[IDX['theta']] = 0.0
-    x[IDX['wd']]    = 0.0
-    x[IDX['y']]     = 0.0
-    x[IDX['z']]     = 0.0
-    x[IDX['v_y']]   = 0.0
-    x[IDX['v_z']]   = 0.0
-
-    # references
-    u = np.array([0.0, 0.0], dtype=np.float64)
-    return jnp.array(x), jnp.array(u)
 
 # ---------- solve equilibrium f(x*,p,u)=0 ----------
 def newton_equilibrium(p_dict, u, x0=None, tol=1e-10, maxit=60):

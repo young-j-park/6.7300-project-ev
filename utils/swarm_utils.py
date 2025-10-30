@@ -18,7 +18,7 @@ from typing import Sequence, Tuple
 import jax
 import jax.numpy as jnp
 
-from drone_model_jax import evalf, N_STATES
+from model.drone_model_jax import evalf, N_STATES
 
 
 def assemble_swarm(targets: Sequence[Tuple[float, float]]):
