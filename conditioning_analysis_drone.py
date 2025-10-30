@@ -10,6 +10,7 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 
+from drone_utils import build_hover_state_and_input
 from drone_model_jax import (
     N_STATES, IDX,
     get_default_params, pack_params,
@@ -47,53 +48,6 @@ def sv_cond_2(A: np.ndarray, eps: float = 0.0):
         return np.inf, s
     return (smax / smin), s
 
-# ---------- Build hover equilibrium ----------
-def build_hover_state_and_input(p_dict: dict):
-    """
-    Hover assumptions:
-      - theta = 0, wd = 0
-      - y = z = 0, vy = vz = 0
-      - Total thrust FT = m*g => each motor thrust = m*g/2
-      - wm_hover = sqrt((m*g/2)/kt)
-      - Electrical states: id=0, iq=0 => lamd=lamf, lamq=0
-      - All PI integrators start at 0
-    u = [y_ref, z_ref] = [0, 0]
-    """
-    m, g, kt = p_dict['m'], p_dict['g'], p_dict['kt']
-    lamf = p_dict['lamf']
-
-    wm_hover = float(np.sqrt((m * g) / (2.0 * kt)))  # equal motors
-    x = np.zeros(N_STATES, dtype=np.float64)
-
-    # Motor fluxes
-    x[IDX['lamdsr_L']] = lamf
-    x[IDX['lamqsr_L']] = 0.0
-    x[IDX['lamdsr_R']] = lamf
-    x[IDX['lamqsr_R']] = 0.0
-
-    # PI integrators
-    x[IDX['integ_id_L']] = 0.0
-    x[IDX['integ_iq_L']] = 0.0
-    x[IDX['integ_id_R']] = 0.0
-    x[IDX['integ_iq_R']] = 0.0
-    x[IDX['integ_w_L']]  = 0.0
-    x[IDX['integ_w_R']]  = 0.0
-
-    # Motor speeds (hover)
-    x[IDX['wm_L']] = wm_hover
-    x[IDX['wm_R']] = wm_hover
-
-    # Body attitude/position/velocity
-    x[IDX['theta']] = 0.0
-    x[IDX['wd']]    = 0.0
-    x[IDX['y']]     = 0.0
-    x[IDX['z']]     = 0.0
-    x[IDX['v_y']]   = 0.0
-    x[IDX['v_z']]   = 0.0
-
-    # Reference inputs (hover)
-    u = np.array([0.0, 0.0], dtype=np.float64)
-    return x, u
 
 # ---------- Jacobian & cond at a single point ----------
 def analyze_point(x: np.ndarray, p_tuple, u: np.ndarray, reg_eps: float = 0.0):
