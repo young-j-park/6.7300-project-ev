@@ -1,8 +1,8 @@
 import numpy as np
 import jax.numpy as jnp
 
-from drone_model_jax import get_default_params, pack_params, N_STATES, IDX
-from swarm_utils import assemble_swarm, swarm_evalf
+from model.drone_model_jax import get_default_params, pack_params, N_STATES, IDX
+from utils.swarm_utils import assemble_swarm, swarm_evalf
 
 
 def test_assembler_drone():

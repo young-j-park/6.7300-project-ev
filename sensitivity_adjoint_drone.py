@@ -22,7 +22,7 @@ from drone_model_jax import (
     unpack_params,           # tuple -> dict
     evalf                    # x' = f(x, p_tuple, u)
 )
-from drone_utils import build_hover_state_and_input
+from utils.drone_utils import build_hover_state_and_input
 
 jax.config.update("jax_enable_x64", True)
 

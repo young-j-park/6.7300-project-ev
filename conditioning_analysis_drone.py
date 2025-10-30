@@ -10,7 +10,7 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 
-from drone_utils import build_hover_state_and_input
+from utils.drone_utils import build_hover_state_and_input
 from drone_model_jax import (
     N_STATES, IDX,
     get_default_params, pack_params,
