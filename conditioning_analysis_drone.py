@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from utils.drone_utils import build_hover_state_and_input
-from drone_model_jax import (
+from model.drone_model_jax import (
     N_STATES, IDX,
     get_default_params, pack_params,
     evalf, compute_jacobian_jax, unpack_params
