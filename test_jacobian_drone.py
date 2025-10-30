@@ -1,4 +1,6 @@
 # test_jacobian_drone.py  (compatible with new drone_model_jax.py)
+import json
+
 import jax
 jax.config.update("jax_enable_x64", True)
 
