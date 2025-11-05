@@ -8,6 +8,7 @@ python3 test_evalf_drone.py
 python3 test_assembler_drone.py
 python3 conditioning_analysis_drone.py
 python3 sensitivity_adjoint_drone.py
+python3 test_newton_solver.py
 
 python3 Simulation_drone.ipynb
 ```
