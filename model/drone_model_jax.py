@@ -52,7 +52,7 @@ def get_default_params():
         # Speed PI (param_rot)
         'Kp_rot': 0.07, 'Ki_rot': 0.3, 'TeMax': 50.0,
         # Current PI (param_cur)
-        'Kpd': 30.0, 'Kid': 500.0, 'Kpq': 30.0, 'Kiq': 500.0,
+        'Kpd': 3.0, 'Kid': 5.0, 'Kpq': 3.0, 'Kiq': 5.0,
         # Drone (D.param)
         'Jd': 0.05, 'r': 0.20, 'kt': 5e-6, 'Dr': 1e-3, 'm': m, 'Dt': 0.05, 'g': g,
         # Outer control (ctrl struct)
@@ -116,8 +116,12 @@ def _controller_motor(Rs, Ld, Lq, lamf, pp, Kpd, Kid, Kpq, Kiq,
     u_d = Kpd * ed + Kid * integ_d
     u_q = Kpq * eq + Kiq * integ_q
     # Decoupling + feedforward
-    vdsr = u_d + Rs * id_mea - we * lamq
-    vqsr = u_q + Rs * iq_mea + we * lamd
+    ff_vdsr = - we * lamq
+    ff_vqsr = + we * lamd
+    # ff_vdsr = Rs * id_mea - we * lamq
+    # ff_vqsr = Rs * iq_mea + we * lamd
+    vdsr = u_d + ff_vdsr
+    vqsr = u_q + ff_vqsr
     return vdsr, vqsr, ed, eq, id_mea, iq_mea
 
 def _dynamics_motor(Rs, Ld, Lq, lamf, Jm, Bm, pp,
