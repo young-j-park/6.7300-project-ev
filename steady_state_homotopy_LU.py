@@ -6,14 +6,16 @@
 import numpy as np
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 
 from model.drone_model_jax import (
     evalf as evalf_jax,          # x' = f(x, p_tuple, u)
     compute_jacobian_jax,        # J = df/dx (JAX JIT)
-    get_default_params, pack_params, N_STATES
+    get_default_params, pack_params, N_STATES, IDX
 )
 
 jax.config.update("jax_enable_x64", True)
+
 
 # -------------------------------
 # JAX -> NumPy wrappers
@@ -109,17 +111,17 @@ def homotopy_solve(
     u: np.ndarray,
     tau_start: float = 0.0,
     tau_end: float = 1.0,
-    init_dt: float = 0.1,
+    init_dt: float = 0.05,
     tol_f: float = 1e-10,
     tol_dx: float = 1e-12,
     verbose: bool = True,
     line_search: bool = True,
     ls_c: float = 1e-4,
     ls_max_bt: int = 20,
-    max_newton_iter: int = 80,
+    max_newton_iter: int = 10,
     dt_growth: float = 1.6,
-    dt_max: float = 0.30,
-    dt_min: float = 1e-6,
+    dt_max: float = 0.10,
+    dt_min: float = 1e-3,
 ):
     x = np.asarray(x0, dtype=float).copy()
     tau = float(tau_start)
@@ -158,16 +160,124 @@ if __name__ == "__main__":
     p_tuple = pack_params(p)
 
     x0 = np.zeros(N_STATES, dtype=float)
-    u  = np.array([1.2345, 1.2345], dtype=float)
+    u  = np.array([1, 1], dtype=float)
 
     x_star, path = homotopy_solve(
         x0=x0, p_tuple=p_tuple, u=u,
         tau_start=0.0, tau_end=1.0,
-        init_dt=0.1, tol_f=1e-10, tol_dx=1e-12, verbose=True,
-        max_newton_iter=80, dt_growth=1.6, dt_max=0.1
+        init_dt=0.025, tol_f=1e-10, tol_dx=1e-12, verbose=True,
+        max_newton_iter=25, dt_growth=2, dt_max=0.05
     )
 
     np.set_printoptions(formatter={'float_kind': lambda v: f"{float(v):.3e}"})
     print("\nFinal steady-state x*:")
     print(x_star)
     print("tau steps:", path.shape[0])
+
+    # ------------------------------------
+    # Plot homotopy path: tau vs states
+    # ------------------------------------
+    # path has shape (n_steps, 1 + N_STATES):
+    #   column 0: tau
+    #   columns 1..: state vector x
+    tau_vals = path[:, 0]
+    X_path   = path[:, 1:]   # shape (n_steps, N_STATES)
+
+    # Extract indices for readability
+    i_lamdL = IDX['lamdsr_L']
+    i_lamqL = IDX['lamqsr_L']
+    i_lamdR = IDX['lamdsr_R']
+    i_lamqR = IDX['lamqsr_R']
+    i_wmL   = IDX['wm_L']
+    i_wmR   = IDX['wm_R']
+    i_y     = IDX['y']
+    i_z     = IDX['z']
+    i_theta = IDX['theta']
+
+    # Extract state trajectories along the homotopy path
+    lamdL_path = X_path[:, i_lamdL]
+    lamqL_path = X_path[:, i_lamqL]
+    lamdR_path = X_path[:, i_lamdR]
+    lamqR_path = X_path[:, i_lamqR]
+    wmL_path   = X_path[:, i_wmL]
+    wmR_path   = X_path[:, i_wmR]
+    y_path     = X_path[:, i_y]
+    z_path     = X_path[:, i_z]
+    theta_path = X_path[:, i_theta]
+
+    # Compute dq-currents from fluxes (using motor parameters)
+    Lds = p['Lds']
+    Lqs = p['Lqs']
+    lamf = p['lamf']
+
+    idL_path = (lamdL_path - lamf) / Lds
+    iqL_path = lamqL_path / Lqs
+    idR_path = (lamdR_path - lamf) / Lds
+    iqR_path = lamqR_path / Lqs
+
+    # -----------------------------
+    # 1) Position (y, z) vs tau
+    # -----------------------------
+    plt.figure(figsize=(6, 4))
+    plt.plot(tau_vals, y_path, label='y position')
+    plt.plot(tau_vals, z_path, label='z position')
+    plt.xlabel(r'Homotopy parameter $\tau$')
+    plt.ylabel('Position [m]')
+    plt.title('Position states along homotopy path')
+    plt.grid(True)
+    plt.legend(loc='best')
+    plt.tight_layout()
+
+    # -----------------------------
+    # 2) Motor speeds vs tau
+    # -----------------------------
+    plt.figure(figsize=(6, 4))
+    plt.plot(tau_vals, wmL_path, label='wm_L')
+    plt.plot(tau_vals, wmR_path, label='wm_R')
+    plt.xlabel(r'Homotopy parameter $\tau$')
+    plt.ylabel('Speed [rad/s]')
+    plt.title('Motor speeds along homotopy path')
+    plt.grid(True)
+    plt.legend(loc='best')
+    plt.tight_layout()
+
+    # -----------------------------
+    # 3) dq currents vs tau
+    #    (electrical quantities grouped together)
+    # -----------------------------
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4), sharex=True)
+
+    # Left motor currents
+    axs[0].plot(tau_vals, idL_path, label='i_dL')
+    axs[0].plot(tau_vals, iqL_path, label='i_qL')
+    axs[0].set_title('Left motor currents')
+    axs[0].set_xlabel(r'$\tau$')
+    axs[0].set_ylabel('Current [A]')
+    axs[0].grid(True)
+    axs[0].legend(loc='best')
+
+    # Right motor currents
+    axs[1].plot(tau_vals, idR_path, label='i_dR')
+    axs[1].plot(tau_vals, iqR_path, label='i_qR')
+    axs[1].set_title('Right motor currents')
+    axs[1].set_xlabel(r'$\tau$')
+    axs[1].grid(True)
+    axs[1].legend(loc='best')
+
+    plt.suptitle('dq currents along homotopy path')
+    plt.tight_layout()
+
+    # -----------------------------
+    # 4) Pitch angle vs tau (optional)
+    # -----------------------------
+    plt.figure(figsize=(6, 4))
+    plt.plot(tau_vals, theta_path, label='theta')
+    plt.xlabel(r'Homotopy parameter $\tau$')
+    plt.ylabel('Pitch angle [rad]')
+    plt.title('Pitch angle along homotopy path')
+    plt.grid(True)
+    plt.legend(loc='best')
+    plt.tight_layout()
+
+    plt.show()
+
