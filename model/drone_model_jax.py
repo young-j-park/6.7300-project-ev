@@ -42,28 +42,131 @@ def pack_params(p: dict):
 
 def unpack_params(p_tuple):
     return {k: p_tuple[i] for i,k in enumerate(PACK_ORDER)}
-
+    
 def get_default_params():
-    # Default parameters derived from MATLAB implementation
-    m = 1.2; g = 9.81
+    """
+    Default parameters.
+
+    Outer-loop position & attitude gains are computed from physical
+    parameters and desired 2nd-order closed-loop dynamics.
+
+    Current-loop PI gains are chosen so that the closed-loop transfer
+    function becomes exactly:
+
+        G_cl(s) = wbw / (s + wbw)
+
+    for each axis, where wbw is the desired current-loop bandwidth.
+    For plant G(s) = 1 / (L s + R), this is achieved by
+
+        Kp = L * wbw
+        Ki = R * wbw
+    """
+
+    # --- Physical parameters ---
+    m  = 1.2
+    g  = 9.81
+    Jd = 0.05
+    r  = 0.20
+    kt = 5e-6
+    Dr = 1e-3
+    Dt = 0.05
+
+    Rs  = 0.05
+    Lds = 8e-3
+    Lqs = 10e-3
+
+    # =========================================================
+    # 1) Design targets for outer-loop dynamics (same as before)
+    # =========================================================
+    # y-position loop
+    wn_y    = 1.0        # [rad/s]
+    zeta_y  = 1.0
+
+    # z-position loop
+    wn_z    = 4.0 / 3.0  # [rad/s]
+    zeta_z  = 1.0
+
+    # theta (pitch attitude) loop
+    wn_th   = 8.0        # [rad/s]
+    zeta_th = 1.0
+
+    # --- Position & attitude gains ---
+    Kp_pos_y = m * wn_y**2
+    Kd_pos_y = 2.0 * m * zeta_y * wn_y - Dt
+    Ki_pos_y = 0.0
+
+    Kp_pos_z = m * wn_z**2
+    Kd_pos_z = 2.0 * m * zeta_z * wn_z - Dt
+    Ki_pos_z = 0.0
+
+    Kp_theta = Jd * wn_th**2
+    Kd_theta = 2.0 * Jd * zeta_th * wn_th - Dr
+
+    # =========================================================
+    # 2) Design targets for current-loop dynamics (1st-order LPF)
+    # =========================================================
+    # Desired current-loop bandwidths (tunable knobs)
+    wbw_d = 100.0   # d-axis current loop bandwidth [rad/s]
+    wbw_q = 100.0   # q-axis current loop bandwidth [rad/s]
+
+    # From G_cl(s) = wbw / (s + wbw)  =>  Kp = L * wbw, Ki = R * wbw
+    Kpd = Lds * wbw_d
+    Kid = Rs  * wbw_d
+
+    Kpq = Lqs * wbw_q
+    Kiq = Rs  * wbw_q
+
     return {
-        # Motor/electrical (param_m)
-        'Rs': 0.05, 'Lds': 8e-3, 'Lqs': 10e-3, 'lamf': 0.04, 'Jm': 1e-3, 'Bm': 1e-4, 'pp': 4,
-        # Speed PI (param_rot)
-        'Kp_rot': 0.07, 'Ki_rot': 0.3, 'TeMax': 50.0,
-        # Current PI (param_cur)
-        'Kpd': 3.0, 'Kid': 5.0, 'Kpq': 3.0, 'Kiq': 5.0,
-        # Drone (D.param)
-        'Jd': 0.05, 'r': 0.20, 'kt': 5e-6, 'Dr': 1e-3, 'm': m, 'Dt': 0.05, 'g': g,
-        # Outer control (ctrl struct)
-        'Kp_pos_y': 0.8, 'Ki_pos_y': 0.0, 'Kd_pos_y': 0.6,
-        'Kp_pos_z': 1.2, 'Ki_pos_z': 0.0, 'Kd_pos_z': 0.8,
-        'Ay_max': 4.0, 'Az_max': 4.0,
-        'Kp_theta': 3.5, 'Kd_theta': 0.8,
+        # Motor / electrical parameters (param_m)
+        'Rs': Rs,
+        'Lds': Lds,
+        'Lqs': Lqs,
+        'lamf': 0.04,
+        'Jm': 1e-3,
+        'Bm': 1e-4,
+        'pp': 4,
+
+        # Rotor speed PI controller (param_rot)
+        'Kp_rot': 0.07,
+        'Ki_rot': 0.3,
+        'TeMax': 50.0,
+
+        # dq current PI controller (param_cur)
+        'Kpd': Kpd,
+        'Kid': Kid,
+        'Kpq': Kpq,
+        'Kiq': Kiq,
+
+        # Drone rigid-body parameters (D.param)
+        'Jd': Jd,
+        'r': r,
+        'kt': kt,
+        'Dr': Dr,
+        'm': m,
+        'Dt': Dt,
+        'g': g,
+
+        # Outer-loop position & attitude control gains (ctrl)
+        'Kp_pos_y': Kp_pos_y,
+        'Ki_pos_y': Ki_pos_y,
+        'Kd_pos_y': Kd_pos_y,
+
+        'Kp_pos_z': Kp_pos_z,
+        'Ki_pos_z': Ki_pos_z,
+        'Kd_pos_z': Kd_pos_z,
+
+        'Ay_max': 4.0,
+        'Az_max': 4.0,
+
+        'Kp_theta': Kp_theta,
+        'Kd_theta': Kd_theta,
+
+        # Motor speed and thrust saturation limits
         'wm_max': 2200.0,
-        'F_sum_max': 3.0*m*g,
-        'F_diff_max': 3.0*m*g,
+        'F_sum_max': 3.0 * m * g,
+        'F_diff_max': 3.0 * m * g,
     }
+
 
 # -------------------------------
 # MATLAB-equivalent blocks (identical structure, continuous-time form)
