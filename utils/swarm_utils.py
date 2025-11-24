@@ -69,6 +69,8 @@ def swarm_evalf(X_flat: jnp.ndarray, p_tuple, U: jnp.ndarray) -> jnp.ndarray:
 
 
 # JIT-ed convenience wrapper: compiles the batched evaluation with XLA.
+swarm_jacobian_func_raw = jax.jacobian(swarm_evalf, argnums=0)
+swarm_compute_jacobian_jax = jax.jit(swarm_jacobian_func_raw)
 swarm_evalf_jit = jax.jit(swarm_evalf)
 
 
