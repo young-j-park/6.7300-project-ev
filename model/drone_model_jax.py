@@ -193,10 +193,13 @@ def _MTPA(Ld, Lq, lamf, pp, Te):
         iq_ref = jnp.where(jnp.isclose(lamf, 0.0), 0.0, Te / (k * lamf))
         return id_ref, iq_ref
     def ipmsm(_):
-        radic = jnp.maximum(lamf**2 + 8.0 * D * tau, 0.0)
+        # radic = jnp.maximum(lamf**2 + 8.0 * D * tau, 0.0)
+        radic = jnp.maximum(lamf**2 + 8.0 * D * tau, 1e-12)
         id_ref = (lamf - jnp.sqrt(radic)) / (4.0 * D)
         denom = lamf - D * id_ref
-        iq_ref = jnp.where(jnp.isclose(denom, 0.0), 0.0, tau / denom)
+        denom_safe = jnp.where(jnp.abs(denom) < 1e-9, 1e-9, denom)
+        iq_ref = tau / denom_safe
+        # iq_ref = jnp.where(jnp.isclose(denom, 0.0), 0.0, tau / denom)
         return id_ref, iq_ref
     return jax.lax.cond(jnp.abs(D) < 1e-12, spmsm, ipmsm, Te)
 
