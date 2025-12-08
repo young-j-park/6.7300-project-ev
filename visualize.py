@@ -1,51 +1,63 @@
 import matplotlib.pyplot as plt
-
+import numpy as np
 from model.drone_model_jax import N_STATES, IDX
 
 
-def visualizeNetwork(x, p, t=None, U=None, xlim=None, ylim=None, legend=False):    
-    # Extract number of drones and positions
-    N = len(x) // N_STATES
-    
-    y_positions = []
-    z_positions = []
-    for i in range(N):
-        base = i * N_STATES
-        y_pos = x[base + IDX['y']]
-        z_pos = x[base + IDX['z']]
-        y_positions.append(y_pos)
-        z_positions.append(z_pos)
-    
-    # Visualization
-    plt.gcf().clear()
-    
-    # Plot targets
-    if U is not None:
-        for i in range(N):
-            plt.plot(U[i][0], U[i][1], 'x', c='red', 
-                     markersize=10, alpha=0.7, label=f'Target {i}')
-            plt.text(U[i][0] + 0.05, U[i][1] + 0.05, 
-                     f'{i}', fontsize=9)
-    
-    # Plot individual drones
-    for i in range(N):
-        plt.plot(y_positions[i], z_positions[i], 'o', c='blue', 
-                 markersize=10, alpha=0.7, label=f'Drone {i}')
-        plt.text(y_positions[i] + 0.05, z_positions[i] + 0.05, 
-                 f'{i}', fontsize=9)
-    
-    title = f'Drone Swarm Visualization ({N} Drones)'
-    if t is not None:
-        title += f' - Time: {t:.2f} s'
-    plt.title(title)
-    
-    plt.xlabel('Y Position (meters)')
-    plt.ylabel('Z Position (meters)')
-    if legend:
-        plt.legend()
-    plt.grid(True)
-    plt.axis('equal')
-    plt.xlim(xlim)
-    plt.ylim(ylim)
-    
-    # plt.pause(0.01)
+class DroneVisualizer:
+    def __init__(self, ax, x_0, U=None, xlim=None, ylim=None):
+        """
+        Initializes the plot elements on the provided Axes (ax).
+        """
+        self.ax = ax
+        self.N = len(x_0) // N_STATES
+
+        # Setup Axes
+        if xlim: self.ax.set_xlim(xlim)
+        if ylim: self.ax.set_ylim(ylim)
+        self.ax.grid(True, linestyle=':', alpha=0.6)
+        self.ax.set_aspect('equal')
+        self.ax.set_xlabel('Y Position (meters)')
+        self.ax.set_ylabel('Z Position (meters)')
+
+        # 1. Plot Targets (Static)
+        if U is not None:
+            U_arr = np.array(U)
+            self.ax.scatter(U_arr[:, 0], U_arr[:, 1], c='red', marker='x',
+                            s=50, alpha=0.7, label='Targets')
+            for i, u in enumerate(U):
+                self.ax.text(u[0] + 0.05, u[1] + 0.05, f'{i}', fontsize=8, color='red')
+
+        # 2. Plot Drones (Dynamic)
+        # We draw them initially at x_0
+        ys, zs = self._get_positions(x_0)
+        self.drone_scatter = self.ax.scatter(ys, zs, c='blue', marker='o',
+                                             s=50, alpha=0.7, label='Drones')
+
+        # Text labels
+        self.drone_texts = [self.ax.text(ys[i], zs[i], f'{i}', fontsize=9, color='blue')
+                            for i in range(self.N)]
+
+        self.ax.legend(loc='upper right')
+        self.title = self.ax.set_title("Initializing...")
+
+    def _get_positions(self, x):
+        """Helper to extract Y and Z coordinates."""
+        x_reshaped = x.reshape(self.N, N_STATES)
+        return x_reshaped[:, IDX['y']], x_reshaped[:, IDX['z']]
+
+    def update(self, x, t):
+        """
+        Updates the positions of existing elements.
+        """
+        ys, zs = self._get_positions(x)
+
+        # Update Scatter positions (efficiently)
+        self.drone_scatter.set_offsets(np.c_[ys, zs])
+
+        # Update Text positions
+        for i, txt in enumerate(self.drone_texts):
+            txt.set_position((ys[i] + 0.05, zs[i] + 0.05))
+
+        # Update Title
+        if t is not None:
+            self.title.set_text(f'Drone Swarm ({self.N} Drones) - Time: {t:.2f} s')
